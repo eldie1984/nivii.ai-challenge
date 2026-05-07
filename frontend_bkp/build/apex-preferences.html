@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>APEX Markets — Preferences</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Design tokens — shared across all components */
+:root {
+  --bg: #030608;
+  --surface: #0a0e13;
+  --surface2: #111820;
+  --border: #1a2535;
+  --accent: #00e5ff;
+  --text: #e8f0fe;
+  --muted: #4a6080;
+  --gain: #00ff9d;
+  --loss: #ff3d71;
+  --hold: #ffd700;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 229, 255, 0.012) 2px, rgba(0, 229, 255, 0.012) 4px);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Common animations */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes flash-gain { 0% { background: rgba(0, 255, 157, 0.15); } 100% { background: transparent; } }
+@keyframes flash-loss { 0% { background: rgba(255, 61, 113, 0.15); } 100% { background: transparent; } }
+.flash-g { animation: flash-gain 0.7s ease-out; }
+.flash-l { animation: flash-loss 0.7s ease-out; }
+
+/* Shared col chrome */
+.col {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  display: flex;
+  flex-direction: column;
+}
+.col:last-child { border-right: none; }
+.col-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+  flex-shrink: 0;
+}
+.col-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.col-meta { font-family: var(--mono); font-size: 8px; color: var(--muted); }
+.empty {
+  padding: 24px 16px;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  text-align: center;
+}
+
+</style>
+<style>
+/* Header + ticker */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10, 14, 19, 0.97);
+  backdrop-filter: blur(12px);
+  position: sticky; top: 0; z-index: 50;
+  height: 52px;
+}
+.logo {
+  font-size: 18px; font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 18px rgba(0, 229, 255, 0.4);
+  letter-spacing: -0.5px;
+}
+.logo span { color: var(--text); }
+.nav-tabs { display: flex; gap: 0; height: 100%; }
+.nav-tab {
+  display: flex; align-items: center;
+  padding: 0 20px;
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+}
+.status-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gain);
+  box-shadow: 0 0 6px var(--gain);
+  animation: pulse 2s infinite;
+  display: inline-block; margin-right: 4px;
+}
+.header-time { color: var(--accent); font-size: 11px; }
+
+.ticker-wrap {
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 5px 0;
+}
+.ticker-tape {
+  display: flex; gap: 36px;
+  animation: ticker 32s linear infinite;
+  white-space: nowrap;
+  font-family: var(--mono); font-size: 10px;
+}
+@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.tick-sym { color: var(--accent); font-weight: 700; }
+.tick-chg.up { color: var(--gain); }
+.tick-chg.dn { color: var(--loss); }
+
+/* Watchlist (shared) */
+.wl-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(26, 37, 53, 0.5);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: grid; grid-template-columns: 1fr auto; gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.wl-item:hover { background: var(--surface2); }
+.wl-item.active { background: rgba(0, 229, 255, 0.05); border-left: 2px solid var(--accent); }
+.wl-sym { font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.wl-badge {
+  font-size: 7px; padding: 2px 4px; border-radius: 2px;
+  font-family: var(--mono); font-weight: 700; letter-spacing: 1px;
+}
+.wl-badge.BUY { background: rgba(0, 255, 157, 0.15); color: var(--gain); border: 1px solid rgba(0, 255, 157, 0.3); }
+.wl-badge.SELL { background: rgba(255, 61, 113, 0.15); color: var(--loss); border: 1px solid rgba(255, 61, 113, 0.3); }
+.wl-badge.HOLD { background: rgba(255, 215, 0, 0.12); color: var(--hold); border: 1px solid rgba(255, 215, 0, 0.3); }
+.wl-name { font-size: 9px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+.wl-price { font-family: var(--mono); font-size: 12px; text-align: right; }
+.wl-chg { font-family: var(--mono); font-size: 9px; text-align: right; }
+
+</style>
+<style>
+/* Auth + Prefs page styles */
+.auth-shell {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 20px;
+  background:
+    radial-gradient(ellipse at top, rgba(0, 229, 255, 0.06), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(0, 255, 157, 0.04), transparent 60%);
+}
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 0 60px rgba(0, 229, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.03);
+  overflow: hidden;
+}
+.auth-brand {
+  text-align: center;
+  padding: 28px 28px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.04), transparent);
+}
+.auth-brand .logo {
+  font-family: var(--sans); font-size: 22px; font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+  letter-spacing: -0.5px;
+}
+.auth-brand .logo span { color: var(--text); }
+.auth-brand .tag {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--muted); margin-top: 6px;
+}
+.auth-tabs { display: flex; }
+.auth-tab {
+  flex: 1; padding: 14px; background: transparent; border: none;
+  font-family: var(--sans); font-size: 11px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.auth-tab:hover { color: var(--text); }
+.auth-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(0, 229, 255, 0.04); }
+.auth-form { padding: 22px 28px 26px; display: none; }
+.auth-form.active { display: block; }
+.auth-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.auth-label {
+  font-family: var(--mono); font-size: 8px;
+  letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+}
+.auth-input {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--mono); font-size: 13px;
+  padding: 10px 12px; border-radius: 2px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.auth-input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+}
+.auth-btn {
+  width: 100%; padding: 12px;
+  background: var(--accent); color: var(--bg); border: none; border-radius: 2px;
+  font-family: var(--sans); font-size: 12px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+  transition: all 0.15s;
+}
+.auth-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0, 229, 255, 0.3); }
+.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.auth-error {
+  background: rgba(255, 61, 113, 0.08);
+  border: 1px solid rgba(255, 61, 113, 0.4);
+  color: var(--loss);
+  font-family: var(--mono); font-size: 10px;
+  padding: 9px 11px; border-radius: 2px;
+  margin-bottom: 14px; display: none;
+}
+.auth-error.show { display: block; }
+.auth-success {
+  background: rgba(0, 255, 157, 0.08);
+  border: 1px solid rgba(0, 255, 157, 0.4);
+  color: var(--gain);
+  font-family: var(--mono); font-size: 10px;
+  padding: 9px 11px; border-radius: 2px;
+  margin-bottom: 14px; display: none;
+}
+.auth-success.show { display: block; }
+.auth-footer {
+  text-align: center; padding: 14px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+}
+.auth-footer a { color: var(--accent); text-decoration: none; }
+
+/* Preferences page */
+.prefs-page {
+  max-width: 880px; margin: 0 auto;
+  padding: 32px 28px 80px;
+}
+.prefs-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 18px; margin-bottom: 26px;
+}
+.prefs-title { font-family: var(--sans); font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+.prefs-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 1px; }
+.prefs-account {
+  font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: right;
+}
+.prefs-account strong { color: var(--accent); font-weight: 700; }
+
+.prefs-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+.prefs-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 20px;
+}
+.prefs-section.full { grid-column: 1 / -1; }
+.prefs-section-title {
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--accent);
+  margin-bottom: 4px;
+}
+.prefs-section-desc {
+  font-size: 11px; color: var(--muted);
+  margin-bottom: 18px; line-height: 1.5;
+}
+.prefs-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(26, 37, 53, 0.5);
+  gap: 18px;
+}
+.prefs-row:last-child { border-bottom: none; }
+.prefs-row-label { flex: 1; }
+.prefs-row-name { font-size: 12px; font-weight: 600; }
+.prefs-row-hint { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+.seg-control { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+.seg-control button {
+  background: transparent; border: none; padding: 6px 12px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  color: var(--muted); cursor: pointer;
+  text-transform: uppercase; transition: all 0.15s;
+}
+.seg-control button:hover { color: var(--text); }
+.seg-control button.active { background: var(--accent); color: var(--bg); font-weight: 700; }
+
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px;
+  background: var(--border); position: relative; cursor: pointer;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--text); transition: transform 0.18s;
+}
+.toggle.on { background: var(--accent); }
+.toggle.on::after { transform: translateX(16px); background: var(--bg); }
+
+.prefs-input, .prefs-select {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--mono); font-size: 12px;
+  padding: 7px 10px; border-radius: 2px; min-width: 140px;
+}
+.prefs-input:focus, .prefs-select:focus { outline: none; border-color: var(--accent); }
+
+.prefs-actions {
+  display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px;
+}
+.prefs-btn {
+  padding: 10px 22px; border-radius: 2px; cursor: pointer;
+  font-family: var(--sans); font-size: 11px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+  transition: all 0.15s;
+}
+.prefs-btn:hover { border-color: var(--accent); color: var(--accent); }
+.prefs-btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.prefs-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,229,255,0.25); }
+.prefs-btn.danger { color: var(--loss); border-color: rgba(255,61,113,0.4); }
+.prefs-btn.danger:hover { background: rgba(255,61,113,0.08); border-color: var(--loss); }
+
+.prefs-saved {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--surface); border: 1px solid var(--gain);
+  color: var(--gain);
+  font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+  padding: 10px 16px; border-radius: 2px;
+  opacity: 0; transform: translateY(8px); pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 0 20px rgba(0,255,157,0.2);
+}
+.prefs-saved.show { opacity: 1; transform: translateY(0); }
+
+/* User chip in header */
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: 12px;
+  font-family: var(--mono); font-size: 9px; color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.user-chip:hover { border-color: var(--accent); color: var(--accent); }
+.user-chip-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gain); box-shadow: 0 0 6px var(--gain);
+}
+
+</style>
+</head>
+<body>
+  <header id="hdr"></header>
+
+  <div class="prefs-page">
+    <div class="prefs-head">
+      <div>
+        <div class="prefs-title">Preferences</div>
+        <div class="prefs-sub">⚙ Trader profile · risk · notifications · session</div>
+      </div>
+      <div class="prefs-account">
+        Signed in as<br>
+        <strong id="acctEmail">—</strong>
+      </div>
+    </div>
+
+    <div class="prefs-grid">
+      <!-- Profile -->
+      <div class="prefs-section">
+        <div class="prefs-section-title">⬛ Profile</div>
+        <div class="prefs-section-desc">Your trader identity, shown in headers and activity logs.</div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Display name</div><div class="prefs-row-hint">How you appear in the app</div></div>
+          <input class="prefs-input" id="p-displayName" type="text">
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Base currency</div><div class="prefs-row-hint">All values displayed in this currency</div></div>
+          <select class="prefs-select" id="p-baseCurrency">
+            <option>USD</option><option>EUR</option><option>GBP</option><option>JPY</option>
+          </select>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Theme</div><div class="prefs-row-hint">Visual density of the terminal</div></div>
+          <div class="seg-control" id="p-theme">
+            <button data-v="cyber">Cyber</button>
+            <button data-v="minimal">Minimal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trading -->
+      <div class="prefs-section">
+        <div class="prefs-section-title">⬡ Trading</div>
+        <div class="prefs-section-desc">Defaults applied to the order entry form.</div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Risk tolerance</div><div class="prefs-row-hint">Influences agent suggestions and default sizing</div></div>
+          <div class="seg-control" id="p-riskTolerance">
+            <button data-v="conservative">Conservative</button>
+            <button data-v="moderate">Moderate</button>
+            <button data-v="aggressive">Aggressive</button>
+          </div>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Default order type</div><div class="prefs-row-hint">Pre-selected when opening order entry</div></div>
+          <select class="prefs-select" id="p-defaultOrderType">
+            <option>MARKET</option><option>LIMIT</option><option>STOP</option><option>STOP LIMIT</option>
+          </select>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Default quantity</div><div class="prefs-row-hint">Shares pre-filled in new orders</div></div>
+          <input class="prefs-input" id="p-defaultQty" type="number" min="1">
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Confirm before submit</div><div class="prefs-row-hint">Show a confirmation dialog before placing orders</div></div>
+          <div class="toggle" id="p-confirmOrders" data-key="confirmOrders"></div>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Auto-analyze on select</div><div class="prefs-row-hint">Run agent automatically when picking a symbol</div></div>
+          <div class="toggle" id="p-autoAnalyze" data-key="autoAnalyze"></div>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="prefs-section">
+        <div class="prefs-section-title">◈ Notifications</div>
+        <div class="prefs-section-desc">What you want to be told about.</div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Agent signals</div><div class="prefs-row-hint">Alert when APEX generates a new BUY/SELL</div></div>
+          <div class="toggle" id="p-notifySignals" data-key="notifySignals"></div>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Order fills</div><div class="prefs-row-hint">Alert when an order is executed</div></div>
+          <div class="toggle" id="p-notifyFills" data-key="notifyFills"></div>
+        </div>
+      </div>
+
+      <!-- Session -->
+      <div class="prefs-section">
+        <div class="prefs-section-title">⬚ Session &amp; Security</div>
+        <div class="prefs-section-desc">Manage your active session.</div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Session timeout</div><div class="prefs-row-hint">Auto sign-out after inactivity</div></div>
+          <select class="prefs-select" id="p-sessionTimeoutMin">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="1440">24 hours</option>
+          </select>
+        </div>
+        <div class="prefs-row">
+          <div class="prefs-row-label"><div class="prefs-row-name">Sign out</div><div class="prefs-row-hint">End your session on this device</div></div>
+          <button class="prefs-btn danger" id="logoutBtn">Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="prefs-actions">
+      <button class="prefs-btn" id="resetBtn">Reset Defaults</button>
+      <button class="prefs-btn primary" id="saveBtn">Save Changes</button>
+    </div>
+  </div>
+
+  <div class="prefs-saved" id="savedToast">✓ Preferences saved</div>
+
+  <script>
+// Event bus — decouples services from components.
+// Services publish, components subscribe.
+window.APEX = window.APEX || {};
+APEX.bus = (function () {
+  const handlers = {};
+  return {
+    on(evt, fn) {
+      (handlers[evt] = handlers[evt] || []).push(fn);
+      return () => this.off(evt, fn);
+    },
+    off(evt, fn) {
+      handlers[evt] = (handlers[evt] || []).filter(h => h !== fn);
+    },
+    emit(evt, payload) {
+      (handlers[evt] || []).forEach(fn => {
+        try { fn(payload); } catch (e) { console.error('[bus]', evt, e); }
+      });
+    },
+  };
+})();
+
+</script>
+  <script>
+// Shared formatters
+window.APEX = window.APEX || {};
+APEX.fmt = {
+  usd(n, opts = {}) {
+    return '$' + Number(n).toLocaleString('en-US', {
+      minimumFractionDigits: opts.minDigits ?? 2,
+      maximumFractionDigits: opts.maxDigits ?? 2,
+    });
+  },
+  usd0(n) { return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 }); },
+  pct(n, digits = 2) { return (n >= 0 ? '+' : '') + Number(n).toFixed(digits) + '%'; },
+  signed(n, digits = 2) { return (n >= 0 ? '+' : '') + Number(n).toFixed(digits); },
+  time(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return isNaN(x) ? '--:--:--' : x.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  },
+  hm(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return isNaN(x) ? '--:--' : x.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  },
+  clock() { return new Date().toLocaleTimeString('en-US', { hour12: false }); },
+  trendColor(up) { return up ? 'var(--gain)' : 'var(--loss)'; },
+  signalColor(sig) {
+    return sig === 'BUY' ? 'var(--gain)' : sig === 'SELL' ? 'var(--loss)' : 'var(--hold)';
+  },
+};
+
+</script>
+  <script>
+// Auth service — signup, login, logout, current user, preferences
+window.APEX = window.APEX || {};
+APEX.auth = (function () {
+  const USERS_KEY = 'apex_users';
+  const SESSION_KEY = 'apex_session';
+  const PREFS_KEY = 'apex_prefs';
+
+  const DEFAULT_PREFS = {
+    displayName: '',
+    email: '',
+    riskTolerance: 'moderate',         // conservative | moderate | aggressive
+    defaultOrderType: 'MARKET',
+    defaultQty: 10,
+    confirmOrders: true,
+    notifySignals: true,
+    notifyFills: true,
+    theme: 'cyber',                    // cyber | minimal
+    autoAnalyze: false,
+    baseCurrency: 'USD',
+    sessionTimeoutMin: 60,
+  };
+
+  function loadUsers() {
+    try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; } catch { return {}; }
+  }
+  function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+
+  function hash(s) {
+    // tiny non-cryptographic hash — good enough for a prototype
+    let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
+    return (h >>> 0).toString(16);
+  }
+
+  function signup({ email, password, displayName }) {
+    email = (email || '').trim().toLowerCase();
+    if (!email || !password) throw new Error('Email and password required.');
+    if (password.length < 6) throw new Error('Password must be at least 6 characters.');
+    const users = loadUsers();
+    if (users[email]) throw new Error('An account with that email already exists.');
+    users[email] = { email, displayName: displayName || email.split('@')[0], pwHash: hash(password), createdAt: new Date().toISOString() };
+    saveUsers(users);
+    setSession(email);
+    setPrefs({ ...DEFAULT_PREFS, email, displayName: users[email].displayName });
+    return users[email];
+  }
+
+  function login({ email, password }) {
+    email = (email || '').trim().toLowerCase();
+    const users = loadUsers();
+    const u = users[email];
+    if (!u || u.pwHash !== hash(password)) throw new Error('Invalid email or password.');
+    setSession(email);
+    if (!getPrefs()) setPrefs({ ...DEFAULT_PREFS, email, displayName: u.displayName });
+    return u;
+  }
+
+  function logout() {
+    localStorage.removeItem(SESSION_KEY);
+    APEX.bus && APEX.bus.emit('auth:logout');
+  }
+
+  function setSession(email) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ email, ts: Date.now() }));
+    APEX.bus && APEX.bus.emit('auth:login', { email });
+  }
+
+  function current() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+      if (!s) return null;
+      const u = loadUsers()[s.email];
+      return u || null;
+    } catch { return null; }
+  }
+
+  function requireAuth(redirect = 'Login.html') {
+    if (!current()) { window.location.href = redirect; return false; }
+    return true;
+  }
+
+  function getPrefs() {
+    try { return JSON.parse(localStorage.getItem(PREFS_KEY)); } catch { return null; }
+  }
+  function setPrefs(p) {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+    APEX.bus && APEX.bus.emit('prefs:changed', p);
+  }
+  function updatePrefs(patch) {
+    const p = { ...(getPrefs() || DEFAULT_PREFS), ...patch };
+    setPrefs(p); return p;
+  }
+
+  return { signup, login, logout, current, requireAuth, getPrefs, setPrefs, updatePrefs, DEFAULT_PREFS };
+})();
+
+</script>
+  <script>
+// Stock service — owns the universe of symbols + price simulation
+window.APEX = window.APEX || {};
+APEX.stocks = (function () {
+  const KEY = 'apex_stocks';
+  const DEFAULT = [
+    { sym: 'AAPL', name: 'Apple Inc.',       price: 192.35, chg: +1.24, color: '#00e5ff', mktCap: '2.9T', sector: 'Technology',     pe: 28.4, vol: '64M' },
+    { sym: 'MSFT', name: 'Microsoft Corp.',  price: 415.80, chg: +0.87, color: '#00ff9d', mktCap: '3.1T', sector: 'Technology',     pe: 34.1, vol: '22M' },
+    { sym: 'NVDA', name: 'NVIDIA Corp.',     price: 875.20, chg: +3.41, color: '#ffd700', mktCap: '2.1T', sector: 'Semiconductors', pe: 62.1, vol: '41M' },
+    { sym: 'GOOGL',name: 'Alphabet Inc.',    price: 175.50, chg: -0.32, color: '#ff9000', mktCap: '2.2T', sector: 'Technology',     pe: 24.8, vol: '18M' },
+    { sym: 'AMZN', name: 'Amazon.com Inc.',  price: 203.15, chg: +1.89, color: '#ff3d71', mktCap: '2.1T', sector: 'Consumer',       pe: 42.3, vol: '31M' },
+    { sym: 'META', name: 'Meta Platforms',   price: 520.40, chg: +2.15, color: '#a78bfa', mktCap: '1.3T', sector: 'Technology',     pe: 26.7, vol: '15M' },
+    { sym: 'TSLA', name: 'Tesla Inc.',       price: 245.60, chg: -1.58, color: '#fb923c', mktCap: '780B', sector: 'EV/Auto',        pe: 55.2, vol: '88M' },
+    { sym: 'JPM',  name: 'JPMorgan Chase',   price: 218.90, chg: +0.43, color: '#34d399', mktCap: '630B', sector: 'Finance',        pe: 12.4, vol: '10M' },
+    { sym: 'NFLX', name: 'Netflix Inc.',     price: 698.25, chg: +2.07, color: '#f87171', mktCap: '300B', sector: 'Streaming',      pe: 44.9, vol: '5M' },
+    { sym: 'COIN', name: 'Coinbase Global',  price: 248.80, chg: -2.14, color: '#60a5fa', mktCap: '63B',  sector: 'Crypto/Fintech', pe: 18.1, vol: '7M' },
+  ];
+  let stocks;
+  try { const s = JSON.parse(localStorage.getItem(KEY)); stocks = s && s.length ? s : DEFAULT.map(x => ({ ...x })); }
+  catch { stocks = DEFAULT.map(x => ({ ...x })); }
+
+  function save() { localStorage.setItem(KEY, JSON.stringify(stocks)); }
+  function reload() {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.length) stocks = s; } catch {}
+  }
+  function all() { return stocks; }
+  function get(sym) { return stocks.find(s => s.sym === sym); }
+  function tick() {
+    stocks.forEach(s => {
+      s.price = Math.max(s.price + (Math.random() - 0.49) * s.price * 0.0025, 1);
+      s.chg += (Math.random() - 0.5) * 0.06;
+    });
+    save();
+    APEX.bus.emit('stocks:tick', stocks);
+  }
+  function startSim(ms = 1400) { setInterval(tick, ms); }
+
+  return { all, get, save, reload, tick, startSim };
+})();
+
+</script>
+  <script>
+// State service — holdings, cash, activity, signals. Persisted to localStorage.
+window.APEX = window.APEX || {};
+APEX.state = (function () {
+  const KEY = 'apex_state';
+  const DEFAULT = { holdings: {}, cashBalance: 50000, activityEvents: [], agentSignals: {}, orderCount: 0 };
+  let state;
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      state = s ? { ...DEFAULT, ...s } : { ...DEFAULT };
+    } catch { state = { ...DEFAULT }; }
+  }
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    APEX.bus.emit('state:changed', state);
+  }
+  load();
+
+  function get() { return state; }
+  function reload() { load(); APEX.bus.emit('state:changed', state); }
+
+  function addActivity(type, text) {
+    state.activityEvents.unshift({ type, text, time: new Date().toISOString() });
+    if (state.activityEvents.length > 30) state.activityEvents.pop();
+    save();
+    APEX.bus.emit('activity:added', { type, text });
+  }
+  function setSignal(sym, sig) {
+    state.agentSignals[sym] = sig;
+    save();
+    APEX.bus.emit('signal:set', { sym, sig });
+  }
+  function applyBuy(sym, qty, price, color) {
+    if (!state.holdings[sym]) state.holdings[sym] = { qty: 0, avgCost: 0, color };
+    const h = state.holdings[sym], nq = h.qty + qty;
+    h.avgCost = (h.avgCost * h.qty + price * qty) / nq;
+    h.qty = nq;
+    state.cashBalance -= price * qty;
+    state.orderCount++;
+    save();
+  }
+  function applySell(sym, qty, price) {
+    if (state.holdings[sym]) {
+      state.holdings[sym].qty = Math.max(0, state.holdings[sym].qty - qty);
+      if (!state.holdings[sym].qty) delete state.holdings[sym];
+    }
+    state.cashBalance += price * qty;
+    state.orderCount++;
+    save();
+  }
+
+  // Cross-tab sync
+  window.addEventListener('storage', e => {
+    if (e.key === KEY) { load(); APEX.bus.emit('state:changed', state); }
+    if (e.key === 'apex_stocks') { APEX.stocks.reload(); APEX.bus.emit('stocks:tick', APEX.stocks.all()); }
+  });
+
+  return { get, save, reload, addActivity, setSignal, applyBuy, applySell };
+})();
+
+</script>
+  <script>
+// Header + ticker components — used by both pages
+window.APEX = window.APEX || {};
+APEX.components = APEX.components || {};
+
+APEX.components.Header = {
+  mount(root, { active }) {
+    const user = APEX.auth && APEX.auth.current ? APEX.auth.current() : null;
+    const userChip = user
+      ? `<a class="user-chip" href="Preferences.html" title="Preferences"><span class="user-chip-dot"></span>${user.displayName || user.email}</a>`
+      : `<a class="user-chip" href="Login.html"><span class="user-chip-dot" style="background:var(--muted);box-shadow:none"></span>Sign In</a>`;
+    root.innerHTML = `
+      <div class="logo">APEX<span> MARKETS</span></div>
+      <nav class="nav-tabs">
+        <a class="nav-tab ${active === 'portfolio' ? 'active' : ''}" href="Portfolio.html">⬛ Portfolio</a>
+        <a class="nav-tab ${active === 'terminal' ? 'active' : ''}" href="Terminal.html">⬡ Trading Terminal</a>
+        <a class="nav-tab ${active === 'preferences' ? 'active' : ''}" href="Preferences.html">⚙ Preferences</a>
+      </nav>
+      <div class="header-right">
+        <span><span class="status-dot"></span>LIVE</span>
+        <span id="hdrBadge" style="color:var(--accent)">${active === 'terminal' ? '⬡ AGENT READY' : '—'}</span>
+        <span class="header-time" id="clock">--:--:--</span>
+        ${userChip}
+      </div>
+    `;
+    const clock = root.querySelector('#clock');
+    function tick() { clock.textContent = APEX.fmt.clock(); }
+    tick(); setInterval(tick, 1000);
+  },
+};
+
+APEX.components.Ticker = {
+  mount(root) {
+    function build() {
+      const stocks = APEX.stocks.all();
+      const signals = APEX.state.get().agentSignals;
+      root.innerHTML = [...stocks, ...stocks].map(s => {
+        const up = s.chg >= 0;
+        const sig = signals[s.sym] ? ` [${signals[s.sym].signal}]` : '';
+        return `<span style="display:inline-flex;gap:7px;align-items:center">
+          <span class="tick-sym">${s.sym}${sig}</span>
+          <span>$${s.price.toFixed(2)}</span>
+          <span class="tick-chg ${up ? 'up' : 'dn'}">${up ? '▲' : '▼'}${Math.abs(s.chg).toFixed(2)}%</span>
+        </span>`;
+      }).join('');
+    }
+    build();
+    APEX.bus.on('stocks:tick', build);
+    APEX.bus.on('signal:set', build);
+    APEX.bus.on('state:changed', build);
+  },
+};
+
+</script>
+
+  <script>
+    if (!APEX.auth.requireAuth()) { /* redirected */ }
+    else {
+      const user = APEX.auth.current();
+      document.getElementById('acctEmail').textContent = user.email;
+      APEX.components.Header.mount(document.getElementById('hdr'), { active: 'preferences' });
+
+      let prefs = APEX.auth.getPrefs() || { ...APEX.auth.DEFAULT_PREFS, email: user.email, displayName: user.displayName };
+
+      function paint() {
+        document.getElementById('p-displayName').value = prefs.displayName || '';
+        document.getElementById('p-baseCurrency').value = prefs.baseCurrency;
+        document.getElementById('p-defaultOrderType').value = prefs.defaultOrderType;
+        document.getElementById('p-defaultQty').value = prefs.defaultQty;
+        document.getElementById('p-sessionTimeoutMin').value = String(prefs.sessionTimeoutMin);
+        // Segmented controls
+        document.querySelectorAll('#p-theme button').forEach(b => b.classList.toggle('active', b.dataset.v === prefs.theme));
+        document.querySelectorAll('#p-riskTolerance button').forEach(b => b.classList.toggle('active', b.dataset.v === prefs.riskTolerance));
+        // Toggles
+        ['confirmOrders','autoAnalyze','notifySignals','notifyFills'].forEach(k => {
+          document.getElementById('p-' + k).classList.toggle('on', !!prefs[k]);
+        });
+      }
+      paint();
+
+      // Segmented controls
+      function bindSeg(id, key) {
+        document.querySelectorAll('#' + id + ' button').forEach(b => {
+          b.addEventListener('click', () => {
+            prefs[key] = b.dataset.v;
+            document.querySelectorAll('#' + id + ' button').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+          });
+        });
+      }
+      bindSeg('p-theme', 'theme');
+      bindSeg('p-riskTolerance', 'riskTolerance');
+
+      // Toggles
+      document.querySelectorAll('.toggle[data-key]').forEach(t => {
+        t.addEventListener('click', () => {
+          const k = t.dataset.key;
+          prefs[k] = !prefs[k];
+          t.classList.toggle('on', prefs[k]);
+        });
+      });
+
+      // Inputs
+      document.getElementById('p-displayName').addEventListener('input', e => prefs.displayName = e.target.value);
+      document.getElementById('p-baseCurrency').addEventListener('change', e => prefs.baseCurrency = e.target.value);
+      document.getElementById('p-defaultOrderType').addEventListener('change', e => prefs.defaultOrderType = e.target.value);
+      document.getElementById('p-defaultQty').addEventListener('input', e => prefs.defaultQty = parseInt(e.target.value) || 1);
+      document.getElementById('p-sessionTimeoutMin').addEventListener('change', e => prefs.sessionTimeoutMin = parseInt(e.target.value));
+
+      // Save
+      function toast(msg, ok = true) {
+        const t = document.getElementById('savedToast');
+        t.textContent = (ok ? '✓ ' : '✕ ') + msg;
+        t.style.borderColor = ok ? 'var(--gain)' : 'var(--loss)';
+        t.style.color = ok ? 'var(--gain)' : 'var(--loss)';
+        t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800);
+      }
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        APEX.auth.setPrefs(prefs);
+        toast('Preferences saved');
+      });
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        prefs = { ...APEX.auth.DEFAULT_PREFS, email: user.email, displayName: user.displayName };
+        APEX.auth.setPrefs(prefs);
+        paint(); toast('Reset to defaults');
+      });
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        APEX.auth.logout(); window.location.href = 'Login.html';
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+*.log
+node_modules
+.env
+.env.local
+.env.*.local
+
+.playwright-mcp
+.playwright-mcp/*
+frontend/dev/*

@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose up *)",
+      "Bash(docker volume *)",
+      "Bash(docker-compose down *)",
+      "Bash(docker-compose ps *)",
+      "Bash(docker-compose stop *)",
+      "Bash(docker-compose rm *)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_click",
+      "Bash(node -e \"const bcrypt = require\\('bcryptjs'\\); bcrypt.hash\\('demo123', 10\\).then\\(h => console.log\\(h\\)\\);\")",
+      "Bash(docker exec *)",
+      "Bash(cp /Users/diegogasch/Downloads/apex-portfolio.html /Users/diegogasch/Downloads/portfolio-tracker/frontend/public/apex-portfolio.html)",
+      "Bash(cp /Users/diegogasch/Downloads/apex-terminal.html /Users/diegogasch/Downloads/portfolio-tracker/frontend/public/apex-terminal.html)",
+      "Bash(cp /Users/diegogasch/Downloads/portfolio-tracker/apex-portfolio.html /Users/diegogasch/Downloads/portfolio-tracker/frontend/public/apex-portfolio.html)",
+      "Bash(cp /Users/diegogasch/Downloads/portfolio-tracker/apex-terminal.html /Users/diegogasch/Downloads/portfolio-tracker/frontend/public/apex-terminal.html)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run *)",
+      "Bash(docker compose *)",
+      "Bash(docker-compose build *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/apex-portfolio.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/apex-terminal.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/apex-portfolio)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/dashboard)",
+      "Bash(npx react-scripts *)",
+      "mcp__playwright__browser_console_messages"
+    ]
+  },
+  "enabledPlugins": {
+    "everything-claude-code@everything-claude-code": true
+  }
+}
