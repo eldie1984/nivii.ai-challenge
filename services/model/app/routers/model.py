@@ -1,15 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
-from uuid import UUID
 import logging
 import os
 
-from ollama import chat
 from ollama import Client
 
-from app.database.connection import get_db,get_schema
+from app.database.connection import get_db
 from app.metrics import record_portfolio_operation
 
 from app.config import settings
@@ -113,54 +109,6 @@ async def create_portfolio(
                 status_code=422,
                 detail=f"SQL generation failed after self-correction. Original error: {error_message}. Correction error: {str(second_error)}"
             )
-    # try:
-    #     response = client.chat(
-    #         model='sqlcoder:7b',
-    #         messages=[
-    #             {'role': 'user', 'content': prompt_template}
-    #         ]
-    #     )
-        
-    #     sql_content = response['message']['content'].strip()
-        
-    #     # 1. Limpieza de tokens especiales del tokenizador (como <s> o </s>)
-    #     sql_content = sql_content.replace("<s>", "").replace("</s>", "").strip()
-    #     if sql_content.startswith("-"):
-    #         sql_content = sql_content.lstrip("-").strip()
-    #     elif sql_content.startswith("."):
-    #         sql_content = sql_content.lstrip(".").strip()
-    #     # 2. Limpieza de bloques markdown por seguridad
-    #     if "```" in sql_content:
-    #         sql_content = sql_content.replace("```sql", "").replace("```", "").strip()
-    #     index = sql_content.find("SELECT")
-    #     if index != -1:
-    #         sql_content = sql_content[index:]
-    #     if "SELECT" not in sql_content:
-    #         logger.error("Error executing model: SELECT not found in query")
-    #         record_portfolio_operation("parse sql", "error")
-    #         raise HTTPException(status_code=504, detail="query")
-    #     is_valid = await validate_and_clean_sql(sql_clean, db)
-    
-    #     if not is_valid:
-    #         # Opción A: Lanzar un error controlado (Evita el problema del Content-Length)
-    #         raise HTTPException(
-    #             status_code=422,
-    #             detail="El modelo generó una consulta SQL inválida para el esquema actual."
-    #         )
-            
-    #     # 3. Si es válida, se retorna con total seguridad de que no romperá el backend
-    #     return {"sql": sql_clean}
-            
-    #     #result = await db.fetchrow(sql_content)
-    #     return{
-    #         "query": sql_content,
-    #         "response": "Query generated successfully"
-    #     }
-        
-    # except Exception as e:
-    #     logger.error(f"Error getting query: {e}")
-    #     record_portfolio_operation("get query", "error")
-    #     raise HTTPException(status_code=500, detail="query")
 
 
 @router.post(
