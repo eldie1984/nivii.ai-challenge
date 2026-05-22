@@ -53,14 +53,14 @@ A full-stack microservices application with AI-powered SQL query generation usin
 
 ### Quick Script (Easiest)
 
-Use the provided `nivi_sql.sh` script for quick environment management:
+Use the provided `nivii_sql.sh` script for quick environment management:
 
 ```bash
 # Make script executable (first time only)
-chmod +x nivi_sql.sh
+chmod +x nivii_sql.sh
 
 # Start all services with Ollama model auto-pull
-./nivi_sql.sh start
+./nivii_sql.sh start
 
 # Stop all services
 ./nivi_sql.sh stop
@@ -984,8 +984,70 @@ class SQLGenerationCache:
         await self.redis.setex(cache_key, 86400, json.dumps(result))
         return result
 ```
+#### D. **Use a cloud serving for models (e.g. Anthropic/openAI/Groq/Gemini)**
+```python
+# Redefine the function to use a cloud serving
+from openai import OpenAI
 
----
+# Initialize the client pointing to local Ollama
+client = OpenAI(
+    base_url='http://localhost:11434/v1/',
+    api_key='ollama',  # Required by the SDK but ignored by Ollama
+)
+def ask_ollama(prompt: str) -> str:
+    """Función auxiliar para interactuar con Ollama de forma limpia"""
+    response = client.chat.completions.create(
+        model='sqlcoder:7b',
+        messages=[{'role': 'user', 'content': prompt}]
+    )
+    return response.choices[0].message.content
+```
+
+#### E. **Use a agent base architecture to handle the SQL generation and accuracy**
+### Arquitectura del Agente Text-to-SQL (LangGraph)
+
+Este diagrama describe el flujo de control, los nodos de decisión y el bucle de auto-corrección implementado en el agente para garantizar la precisión de las consultas generadas.
+
+```mermaid
+graph TD
+    %% Estilos de Nodos
+    classDef startEnd fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
+    classDef LLMNode fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+    classDef ToolNode fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
+    classDef Router fill:#f1c40f,stroke:#f39c12,stroke-width:2px,color:#000;
+    classDef ErrorNode fill:#e74c3c,stroke:#c0392b,stroke-width:2px,color:#fff;
+
+    %% Nodos principales
+    Start([1. Pregunta del Usuario]) --> InitState[Inicializar Estado LangGraph<br/>* Guardar prompt original<br/>* Cargar DB_SCHEMA de memoria]
+    InitState --> NodeGenSQL[2. Nodo: Generador SQL<br/>LLM: sqlcoder:7b]
+    
+    %% Validación
+    NodeGenSQL --> NodeValidate[3. Nodo: Validador de Sintaxis<br/>Tool: EXPLAIN en Postgres]
+    
+    %% Router de Decisión
+    NodeValidate --> RouterCheck{¿Consulta Válida?}
+    
+    %% Camino Exitoso
+    RouterCheck -- SÍ --> NodeExecute[4. Nodo: Ejecutor SQL<br/>Tool: db.fetchrow/fetchall]
+    NodeExecute --> NodeExplain[5. Nodo: Explicador de Resultados<br/>LLM: Conversacional]
+    NodeExplain --> End([Respuesta Final en JSON])
+
+    %% Camino de Error (Bucle de Feedback)
+    RouterCheck -- NO --> RouterRetry{¿Intentos < Máximo?<br/>Max: 2}
+    
+    RouterRetry -- SÍ --> NodeFeedback[6. Nodo: Reparación con Feedback<br/>Inyectar: Invalid SQL + Postgres Error]
+    NodeFeedback --> NodeGenSQL
+    
+    RouterRetry -- NO --> NodeError[7. Nodo: Manejo de Excepciones<br/>Lanzar HTTPException 422/500]
+    NodeError --> End
+
+    %% Asignación de Estilos
+    class Start,End startEnd;
+    class NodeGenSQL,NodeExplain,NodeFeedback LLMNode;
+    class NodeValidate,NodeExecute ToolNode;
+    class RouterCheck,RouterRetry Router;
+    class NodeError ErrorNode;
+```
 
 ## 5. Full Scaled Architecture (Production)
 
@@ -1283,3 +1345,37 @@ For issues and questions:
 - Create an issue on GitHub
 - Check existing documentation
 - Review API logs for debugging
+
+
+## Trade Offs
+
+### Local Ollama vs Cloud Models
+
+**Local Ollama:**
+- ✅ Lower latency (no network round-trip)
+- ✅ Privacy (data stays on-premises)
+- ✅ No API costs
+- ✅ Can fine-tune models
+- ❌ Requires local GPU resources
+- ❌ Manual model management
+- ❌ No automatic updates
+
+**Cloud Models (Anthropic/Groq/Gemini):**
+- ✅ Better performance out of the box
+- ✅ Automatic scaling
+- ✅ Regular updates and improvements
+- ✅ Managed infrastructure
+- ❌ Higher latency (network dependent)
+- ❌ Data sent to third-party
+- ❌ Ongoing API costs
+- ❌ Vendor lock-in
+
+**Recommendation:** Start with local Ollama for development and small-scale deployment. Migrate to cloud models when:
+- You need better performance
+- You have sufficient traffic to justify costs
+- You want automatic model updates
+- Privacy requirements allow cloud processing
+
+### Ollama Model Tested
+ - SQLCoder:7B (best for SQL generation) - tested and working, require more than 1 retry to work
+ - duckdb-nsql (good general purpose) - doesn't run in a personal computer
