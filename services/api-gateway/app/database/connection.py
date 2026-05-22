@@ -33,7 +33,7 @@ class Database:
             logger.info("Database connection pool closed")
 
     @classmethod
-    async def get_connection(cls):
+    def get_connection(cls):
         """Get a database connection from the pool"""
         if not cls.pool:
             raise RuntimeError("Database pool not initialized")
@@ -44,7 +44,6 @@ async def init_db():
     from app.config import settings
     await Database.connect(settings.DATABASE_URL)
 
-async def get_db():
+def get_db():
     """Dependency to get database connection"""
-    async with Database.get_connection() as connection:
-        yield connection
+    return Database.get_connection()

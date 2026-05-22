@@ -5,7 +5,7 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: portfolio_tracker
+      POSTGRES_DB: niivi_challenge
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
@@ -13,96 +13,66 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
-  # Redis for message queuing
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
+      - ./database/data.csv:/data/my_file.csv 
+  schema-generator:
+    image: postgres:15-alpine
+    container_name: schema-generator
+    depends_on:
+      - postgres
+    volumes:
+      - shared-schema:/shared
+    environment:
+      PGPASSWORD: password
+    entrypoint: >
+      sh -c "
+        until pg_isready -h postgres -p 5432 -U postgres; do sleep 1; done;
+        pg_dump -h postgres -U postgres -d niivi_challenge --schema-only > /shared/schema.sql;
+      "
+  
   # API Gateway
   api-gateway:
     build: ./services/api-gateway
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/portfolio_tracker
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=your-jwt-secret-key
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/niivi_challenge
     depends_on:
       - postgres
-      - redis
     volumes:
       - ./services/api-gateway:/app
-      - /app/node_modules
 
-  # Portfolio Service
-  portfolio-service:
-    build: ./services/portfolio
+
+  # Model Service
+  model-service:
+    build: ./services/model
     ports:
       - "3002:3002"
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/portfolio_tracker
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/niivi_challenge
+      - OLLAMA_HOST=http://ollama:11434
+      - SCHEMA_FILE_PATH=/app/schema/schema.sql
     depends_on:
-      - postgres
-      - redis
+      ollama:
+        condition: service_started
+      # 2. Tu condición de completado para el extractor de esquema
+      schema-generator:
+        condition: service_completed_successfully
     volumes:
-      - ./services/portfolio:/app
-      - /app/node_modules
+      - ./services/model:/app
+      - shared-schema:/app/schema:ro # Monta el esquema como Solo Lectura
+      
 
-  # Transaction Service
-  transaction-service:
-    build: ./services/transaction
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
     ports:
-      - "3003:3003"
+      - "11435:11434"
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/portfolio_tracker
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - postgres
-      - redis
+      - OLLAMA_HOST=0.0.0.0:11434  # <-- CRÍTICO: Le dice a Ollama que acepte conexiones externas (de otros contenedores)
     volumes:
-      - ./services/transaction:/app
-      - /app/node_modules
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
 
-  # Agent Orchestrator Service
-  agent-service:
-    build: ./services/agent-orchestrator
-    ports:
-      - "3004:3004"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/portfolio_tracker
-      - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./services/agent-orchestrator:/app
-      - /app/node_modules
-
-  # Cryptocurrency Service
-  crypto-service:
-    build: ./services/cryptocurrency
-    ports:
-      - "3005:3005"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@postgres:5432/portfolio_tracker
-      - REDIS_URL=redis://redis:6379
-      - BINANCE_API_KEY=${BINANCE_API_KEY}
-      - COINBASE_API_KEY=${COINBASE_API_KEY}
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - ./services/cryptocurrency:/app
-      - /app/node_modules
 
   # Frontend
   frontend:
@@ -126,23 +96,7 @@ services:
       - frontend
       - api-gateway
 
-  # Monitoring
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3006:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - grafana_data:/var/lib/grafana
-
 volumes:
   postgres_data:
-  grafana_data:
+  ollama-data:
+  shared-schema:

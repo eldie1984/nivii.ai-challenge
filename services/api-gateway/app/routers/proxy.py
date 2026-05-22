@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Service URLs mapping
 SERVICES = {
-    "cryptocurrency": settings.CRYPTOCURRENCY_SERVICE_URL,
-    "portfolio": settings.PORTFOLIO_SERVICE_URL,
-    "agent": settings.AGENT_ORCHESTRATOR_URL,
+    "model": settings.MODEL_SERVICE_URL,
 }
 
 async def proxy_request(
@@ -58,7 +56,7 @@ async def proxy_request(
         # Create response with same status code and headers
         response_headers = {}
         for key, value in response.headers.items():
-            if key.lower() not in ['content-encoding', 'content-length', 'transfer-encoding']:
+            if key.lower() not in ['content-encoding', 'transfer-encoding']:
                 response_headers[key] = value
         
         return Response(
@@ -76,147 +74,72 @@ async def proxy_request(
         logger.error(f"Proxy error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# Cryptocurrency service routes
-@router.get("/cryptocurrency/prices")
-async def get_crypto_prices(
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get cryptocurrency prices"""
-    return await proxy_request(
-        service="cryptocurrency",
-        path="/api/prices",
-        method="GET",
-        headers=dict(request.headers),
-        params=dict(request.query_params),
-        current_user=current_user
-    )
 
-@router.get("/cryptocurrency/{path:path}")
-async def proxy_cryptocurrency_get(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
+@router.post("/query")
+async def get_query(
+    request: Request
 ):
-    """Proxy GET requests to cryptocurrency service"""
-    return await proxy_request(
-        service="cryptocurrency",
-        path=f"/api/{path}",
-        method="GET",
-        headers=dict(request.headers),
-        params=dict(request.query_params),
-        current_user=current_user
-    )
+    """Get model_query"""
+    try:
+        body = await request.json()
+    except:
+        body = None
 
-@router.post("/cryptocurrency/{path:path}")
-async def proxy_cryptocurrency_post(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Proxy POST requests to cryptocurrency service"""
     return await proxy_request(
-        service="cryptocurrency",
-        path=f"/api/{path}",
+        service="model",
+        path="/api/query",
         method="POST",
         headers=dict(request.headers),
-        json_data=await request.json(),
-        current_user=current_user
-    )
-
-# Portfolio service routes
-@router.get("/portfolio/{path:path}")
-async def proxy_portfolio_get(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Proxy GET requests to portfolio service"""
-    return await proxy_request(
-        service="portfolio",
-        path=f"/api/{path}",
-        method="GET",
-        headers=dict(request.headers),
         params=dict(request.query_params),
-        current_user=current_user
+        json_data=body
     )
 
-@router.post("/portfolio/{path:path}")
-async def proxy_portfolio_post(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
+@router.post("/execute")
+async def execute_query(
+    request: Request
 ):
-    """Proxy POST requests to portfolio service"""
+    """Execute model_query"""
+    try:
+        body = await request.json()
+    except:
+        body = None
+
     return await proxy_request(
-        service="portfolio",
-        path=f"/api/{path}",
+        service="model",
+        path="/api/execute",
         method="POST",
         headers=dict(request.headers),
-        json_data=await request.json(),
-        current_user=current_user
-    )
-
-@router.put("/portfolio/{path:path}")
-async def proxy_portfolio_put(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Proxy PUT requests to portfolio service"""
-    return await proxy_request(
-        service="portfolio",
-        path=f"/api/{path}",
-        method="PUT",
-        headers=dict(request.headers),
-        json_data=await request.json(),
-        current_user=current_user
-    )
-
-@router.delete("/portfolio/{path:path}")
-async def proxy_portfolio_delete(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Proxy DELETE requests to portfolio service"""
-    return await proxy_request(
-        service="portfolio",
-        path=f"/api/{path}",
-        method="DELETE",
-        headers=dict(request.headers),
-        current_user=current_user
-    )
-
-# Agent orchestrator routes
-@router.get("/agent/{path:path}")
-async def proxy_agent_get(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Proxy GET requests to agent orchestrator"""
-    return await proxy_request(
-        service="agent",
-        path=f"/api/{path}",
-        method="GET",
-        headers=dict(request.headers),
         params=dict(request.query_params),
-        current_user=current_user
+        json_data=body
     )
 
-@router.post("/agent/{path:path}")
-async def proxy_agent_post(
-    path: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
+@router.post("/explain")
+async def explain_query(
+    request: Request
 ):
-    """Proxy POST requests to agent orchestrator"""
+    """Explain model_query"""
+    try:
+        body = await request.json()
+    except Exception: 
+        body = None
+        
+    # 1. Clonamos los headers originales en un diccionario común
+    clean_headers = dict(request.headers)
+    
+    # 2. Eliminamos CUALQUIER header de longitud para forzar a la librería proxy
+    # a calcular el tamaño real del body saliente.
+    clean_headers.pop("content-length", None)
+    clean_headers.pop("Content-Length", None)
+    
+    # 3. Quitamos el host viejo para evitar bloqueos de ruteo de red en Docker
+    clean_headers.pop("host", None)
+    clean_headers.pop("Host", None)
+        
     return await proxy_request(
-        service="agent",
-        path=f"/api/{path}",
+        service="model",
+        path="/api/explain",
         method="POST",
-        headers=dict(request.headers),
-        json_data=await request.json(),
-        current_user=current_user
+        headers=clean_headers,  # <--- Enviamos los headers limpios de peso
+        params=dict(request.query_params),
+        json_data=body
     )

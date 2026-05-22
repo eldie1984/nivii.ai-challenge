@@ -14,7 +14,8 @@ from app.config import settings
 from app.database import init_db
 from app.routers import auth, proxy
 from app.middleware.error_handler import setup_error_handlers
-from app.metrics import MetricsMiddleware, metrics_endpoint
+from app.metrics import MetricsMiddleware, get_raw_metrics, CONTENT_TYPE_LATEST
+from fastapi import Response
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -28,8 +29,8 @@ async def lifespan(app: FastAPI):
     pass
 
 app = FastAPI(
-    title="Portfolio Tracker API Gateway",
-    description="API Gateway for Portfolio Tracker microservices",
+    title="database API Gateway",
+    description="API Gateway for database microservices",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -57,8 +58,23 @@ app.add_middleware(
 setup_error_handlers(app)
 
 # Add metrics middleware
+#app.add_middleware(MetricsMiddleware)
 app.add_middleware(MetricsMiddleware)
 
+@app.get("/metrics", tags=["Metrics"])
+async def metrics():
+    """Prometheus metrics endpoint"""
+    try:
+        return Response(
+            content=get_raw_metrics(), 
+            media_type=CONTENT_TYPE_LATEST
+        )
+    except Exception:
+        return Response(
+            content="Error generating metrics", 
+            status_code=500, 
+            media_type="text/plain"
+        )
 # Health check
 @app.get("/health", tags=["Health"])
 @limiter.limit("60/minute")
@@ -76,7 +92,6 @@ async def metrics():
     return await metrics_endpoint()
 
 # Include routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(proxy.router, prefix="/api", tags=["Proxy"])
 
 if __name__ == "__main__":
