@@ -3,10 +3,8 @@
 import { Lightbulb } from "lucide-react";
 
 const EXAMPLE_PROMPTS = [
-  "Find the top 10 customers by revenue",
-  "Show monthly sales growth rate",
-  "List products with low inventory",
-  "Get average order value by region",
+  "show me the most valuable item",
+  "show me the least valuable item",
 ];
 
 interface ExamplePromptsProps {

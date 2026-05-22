@@ -1,4 +1,4 @@
-# Nivi - Portfolio Management & AI-Driven Query Service
+# Nivi -  AI-Driven Query Service
 
 A full-stack microservices application with AI-powered SQL query generation using Ollama (SQLCoder model). The system allows natural language queries to be converted into SQL and executed against a PostgreSQL database.
 
