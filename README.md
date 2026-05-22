@@ -4,38 +4,38 @@ A full-stack microservices application with AI-powered SQL query generation usin
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16)                     │
-│                     Port 3000 (Nginx)                        │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│             API Gateway (FastAPI) Port 3001                  │
-│   • Authentication & Authorization (JWT)                     │
-│   • Request Validation & Rate Limiting (slowapi)             │
-│   • Service Proxying & Routing                               │
-│   • Prometheus Metrics                                       │
-└────────────┬──────────────────────────────┬─────────────────┘
-             │                              │
-    ┌────────▼───────────┐       ┌──────────▼────────────┐
-    │  Model Service     │       │  PostgreSQL Database  │
-    │  (FastAPI)         │       │   Port 5432           │
-    │  Port 3002         │       │                       │
-    │ • SQL Generation   │       │ • Product table       │
-    │ • Query Execution  │       │ • Portfolio data      │
-    │ • Result Explain   │       │ • User data           │
-    └────────┬───────────┘       └──────────────────────┘
-             │
-    ┌────────▼───────────┐
-    │  Ollama Service    │
-    │  (SQLCoder: 7b)    │
-    │  Port 11434        │
-    │ • SQL Generation   │
-    │ • Query Explanation│
-    └────────────────────┘
-```
+```mermaid
+graph TD
+    %% Estilos de diseño para la vista general
+    classDef frontend fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+    classDef gateway fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff;
+    classDef service fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
+    classDef database fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
 
+    FE["Frontend (Next.js 16)<br/>Port 3000 (Nginx)"]
+    
+    GW["API Gateway (FastAPI) Port 3001<br/>• Authentication & Authorization (JWT)<br/>• Request Validation & Rate Limiting (slowapi)<br/>• Service Proxying & Routing<br/>• Prometheus Metrics"]
+    
+    MS["Model Service (FastAPI)<br/>Port 3002<br/>• SQL Generation<br/>• Query Execution<br/>• Result Explain"]
+    
+    DB[("PostgreSQL Database<br/>Port 5432<br/>• Product table<br/>• Portfolio data<br/>• User data")]
+    
+    OL["Ollama Service (SQLCoder: 7b)<br/>Port 11434<br/>• SQL Generation<br/>• Query Explanation"]
+
+    %% Direcciones del flujo
+    FE --> GW
+    GW --> MS
+    GW --> DB
+    MS --> OL
+
+    %% Asignación de clases visuales
+    class FE frontend;
+    class GW gateway;
+    class MS service;
+    class OL service;
+    class DB database;
+
+```
 ## Prerequisites
 
 ### Required
@@ -1051,45 +1051,74 @@ graph TD
 
 ## 5. Full Scaled Architecture (Production)
 
-```
-                         ┌──────────────────────────────────────┐
-                         │     Cloudflare / CDN                  │
-                         │   (Global Content Delivery)           │
-                         └────────────────┬─────────────────────┘
-                                          │
-                      ┌───────────────────┴────────────────────┐
-                      │                                        │
-        ┌─────────────▼──────────────┐         ┌──────────────▼─────────┐
-        │  AWS ALB / HAProxy         │         │  WAF / DDoS Protection  │
-        │  (Load Balancer)           │         │  (AWS Shield)           │
-        └─────────────┬──────────────┘         └────────────────────────┘
-                      │
-        ┌─────────────┴──────────────┬────────────────┬────────────────┐
-        │                            │                │                │
-    ┌───▼────┐              ┌────────▼────┐      ┌───▼────┐      ┌────▼────┐
-    │Frontend│              │ API Gateway │      │ Model  │      │  Celery  │
-    │Pod 1-N │◄─────────┐   │  Pod 1-3    │      │Service │      │ Workers  │
-    └────────┘          │   └─────────────┘      │Pod 1-2 │      │(Job Q)   │
-                        │                        └────────┘      └──────────┘
-                        │                             │
-                        └──────────────┬──────────────┘
-                                       │
-          ┌────────────────────────────┼────────────────────────────┐
-          │                            │                            │
-      ┌───▼────────┐          ┌────────▼────────┐        ┌─────────▼──────┐
-      │   Redis    │          │  PostgreSQL     │        │   Ollama       │
-      │  (Cache)   │          │  Primary+       │        │  Instances     │
-      │            │          │  Read Replicas  │        │  (Sharded)     │
-      └────────────┘          │  (Partitioned)  │        └────────────────┘
-                              └─────────────────┘
-                                       │
-                         ┌─────────────┴──────────────┐
-                         │                            │
-                    ┌────▼─────┐            ┌─────────▼──┐
-                    │  Shard 1  │            │  Shard 4   │
-                    │  (S3 Bkp) │            │  (S3 Bkp)  │
-                    └───────────┘            └────────────┘
+```mermaid
+graph TD
+    %% Configuración de paleta de colores para infraestructura productiva
+    classDef edgeClass fill:#2c3e50,stroke:#1a252f,stroke-width:2px,color:#fff;
+    classDef ingressClass fill:#2980b9,stroke:#1f3a60,stroke-width:2px,color:#fff;
+    classDef appClass fill:#8e44ad,stroke:#5b2c6f,stroke-width:2px,color:#fff;
+    classDef dbClass fill:#27ae60,stroke:#196f3d,stroke-width:2px,color:#fff;
+    classDef storageClass fill:#e67e22,stroke:#a04000,stroke-width:2px,color:#fff;
 
+    %% --- NETWORK EDGE & SECURITY ---
+    subgraph Capa_Edge [Capa Global & Seguridad]
+        CF["Cloudflare / CDN<br/>(Global Content Delivery)"]
+        WAF["WAF / DDoS Protection<br/>(AWS Shield)"]
+    end
+    CF --- WAF
+
+    %% --- INGRESS LOAD BALANCING ---
+    subgraph Capa_Ingreso [Load Balancing]
+        ALB["AWS ALB / HAProxy<br/>(Load Balancer)"]
+    end
+    CF --> ALB
+
+    %% --- COMPUTATION & MICROSERVICES ---
+    subgraph Capa_Aplicacion [Capa de Aplicación & Workers]
+        FE["Frontend<br/>Pod 1-N"]
+        GW["API Gateway<br/>Pod 1-3"]
+        MS["Model Service<br/>Pod 1-2"]
+        CEL["Celery Workers<br/>(Job Q)"]
+    end
+    
+    %% Ruteo balanceado desde el ALB
+    ALB --> FE
+    ALB --> GW
+    ALB --> MS
+    ALB --> CEL
+
+    %% Intercomunicación de retorno interna
+    GW -. Inter-routing .-> FE
+    MS -. Callback .-> FE
+
+    %% --- CACHING, STATE & PERSISTENCE ---
+    subgraph Capa_Persistencia [Caché, Datos & LLM]
+        REDIS[("Redis<br/>(Cache)")]
+        PG[("PostgreSQL<br/>Primary+ Read Replicas<br/>(Partitioned)")]
+        OLLAMA["Ollama Instances<br/>(Sharded)"]
+    end
+
+    %% Acceso a la capa de datos
+    FE & GW & MS & CEL ---> REDIS
+    FE & GW & MS & CEL ---> PG
+    MS ---> OLLAMA
+
+    %% --- COLD STORAGE & COMPLIANCE ---
+    subgraph Capa_Storage [Shards & Backups]
+        SHARD1[("Shard 1<br/>(S3 Bkp)")]
+        SHARD4[("Shard 4<br/>(S3 Bkp)")]
+    end
+    PG --> SHARD1
+    PG --> SHARD4
+
+    %% Inicialización de estilos por componente
+    class CF,WAF edgeClass;
+    class ALB ingressClass;
+    class FE,GW,MS,CEL appClass;
+    class REDIS,PG,OLLAMA dbClass;
+    class SHARD1,SHARD4 storageClass;
+```
+```
 Monitoring & Observability:
 ├── Prometheus (Metrics collection)
 ├── Grafana (Visualization)
