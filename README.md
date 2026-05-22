@@ -1,6 +1,6 @@
 # Nivi - Portfolio Management & AI-Driven Query Service
 
-A full-stack microservices application for portfolio management with AI-powered SQL query generation using Ollama (SQLCoder model). The system allows natural language queries to be converted into SQL and executed against a PostgreSQL database.
+A full-stack microservices application with AI-powered SQL query generation using Ollama (SQLCoder model). The system allows natural language queries to be converted into SQL and executed against a PostgreSQL database.
 
 ## Architecture Overview
 
@@ -51,6 +51,34 @@ A full-stack microservices application for portfolio management with AI-powered 
 
 ## Quick Start
 
+### Quick Script (Easiest)
+
+Use the provided `nivi_sql.sh` script for quick environment management:
+
+```bash
+# Make script executable (first time only)
+chmod +x nivi_sql.sh
+
+# Start all services with Ollama model auto-pull
+./nivi_sql.sh start
+
+# Stop all services
+./nivi_sql.sh stop
+
+# Restart everything
+./nivi_sql.sh restart
+
+# Full rebuild and start (for production)
+./nivi_sql.sh dev
+```
+
+The script automatically:
+- Starts/stops Docker Compose containers
+- Pulls the SQLCoder model for Ollama
+- Shows live logs when using `dev` option
+
+---
+
 ### Option 1: Docker Compose (Recommended)
 
 #### 1. Start all services:
@@ -67,7 +95,15 @@ This starts:
 - Frontend (port 3000)
 - Nginx reverse proxy (port 80)
 
-#### 2. Verify services are running:
+#### 2. Download the ollama model:
+```bash
+docker-compose exec ollama ollama pull sqlcoder:7b
+```
+
+This starts:
+- Pulls the model to be used in the application
+
+#### 3. Verify services are running:
 ```bash
 # Check all containers
 docker-compose ps
@@ -229,7 +265,7 @@ GET /health
 Response:
 {
   "status": "ok",
-  "service": "portfolio-service",
+  "service": "model-service",
   "timestamp": "2025-01-15T10:30:00.123456",
   "version": "2.0.0"
 }
@@ -690,7 +726,7 @@ export const revalidate = 3600; // ISR - regenerate every hour
 
 export default async function RootLayout({ children }) {
   // Pre-fetch data at build time
-  const portfolios = await fetchPortfolios();
+  const queries = await fetchQueries();
   
   return (
     <html>

@@ -58,7 +58,6 @@ app.add_middleware(
 setup_error_handlers(app)
 
 # Add metrics middleware
-#app.add_middleware(MetricsMiddleware)
 app.add_middleware(MetricsMiddleware)
 
 @app.get("/metrics", tags=["Metrics"])
@@ -66,16 +65,16 @@ async def metrics():
     """Prometheus metrics endpoint"""
     try:
         return Response(
-            content=get_raw_metrics(), 
+            content=get_raw_metrics(),
             media_type=CONTENT_TYPE_LATEST
         )
     except Exception:
         return Response(
-            content="Error generating metrics", 
-            status_code=500, 
+            content="Error generating metrics",
+            status_code=500,
             media_type="text/plain"
         )
-# Health check
+
 @app.get("/health", tags=["Health"])
 @limiter.limit("60/minute")
 async def health_check(request: Request):
@@ -85,11 +84,6 @@ async def health_check(request: Request):
         "timestamp": datetime.utcnow().isoformat(),
         "version": "2.0.0"
     }
-
-@app.get("/metrics", tags=["Metrics"])
-async def metrics():
-    """Prometheus metrics endpoint"""
-    return await metrics_endpoint()
 
 # Include routers
 app.include_router(proxy.router, prefix="/api", tags=["Proxy"])

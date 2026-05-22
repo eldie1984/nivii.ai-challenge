@@ -32,7 +32,11 @@
       "mcp__playwright__browser_console_messages",
       "Bash(xargs ls *)",
       "Bash(npm install *)",
-      "Bash(npx playwright *)"
+      "Bash(npx playwright *)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(pip install *)",
+      "Bash(docker-compose exec *)",
+      "Bash(docker-compose restart *)"
     ]
   },
   "enabledPlugins": {

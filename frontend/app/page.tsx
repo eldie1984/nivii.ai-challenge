@@ -61,12 +61,13 @@ async function postJson(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    throw new HttpError(
-      res.status,
-      `Request failed (${res.status} ${res.statusText})${
-        errText ? `: ${errText}` : ""
-      }`,
-    );
+    const message =
+      res.status === 500 || res.status === 504
+        ? "In this moment we can't process the request, please retry or reformulate your question."
+        : `Request failed (${res.status} ${res.statusText})${
+            errText ? `: ${errText}` : ""
+          }`;
+    throw new HttpError(res.status, message);
   }
 
   const contentType = res.headers.get("content-type") ?? "";
@@ -79,7 +80,7 @@ async function postJson(
 }
 
 const RETRY_STATUSES = new Set([504]);
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
 const sleep = (ms: number) =>
@@ -229,11 +230,13 @@ export default function SqlAssistantPage() {
     setExplanation(null);
 
     try {
-      const { data, text } = await postJsonWithRetry("/explain", {
-        query: response.sql,
-        result: executionResult ?? response.results,
-        prompt: submittedPrompt,
-      },
+      const { data, text } = await postJsonWithRetry(
+        "/explain",
+        {
+          query: response.sql,
+          result: executionResult ?? response.results,
+          prompt: submittedPrompt,
+        },
         {
           onRetry: (attempt) => {
             console.warn(
@@ -331,11 +334,6 @@ export default function SqlAssistantPage() {
                 results={executionResult}
               />
             )}
-
-            <ResultsDisplay
-              title="Response"
-              results={response.results}
-            />
 
             {explanationError && (
               <div className="rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-400">

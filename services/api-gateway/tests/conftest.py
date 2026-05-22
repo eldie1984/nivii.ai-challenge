@@ -1,13 +1,16 @@
 import pytest
 import asyncio
+import sys
+from pathlib import Path
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 from unittest.mock import Mock, patch
-import tempfile
-import os
 from datetime import datetime, timedelta
 
-from app.main import app
+# Add parent directory to Python path to import main module
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from main import app
 from app.config import settings
 
 
